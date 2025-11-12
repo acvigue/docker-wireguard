@@ -32,28 +32,6 @@ echo "Preserving Docker DNS servers: $docker_dns_servers" >&2
 # Start WireGuard
 wg-quick up $interface
 
-wg_dns_servers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}')
-echo "WireGuard DNS servers: $wg_dns_servers" >&2
-
-# Restore Docker's DNS servers alongside WireGuard's DNS
-if [[ ! -z "$docker_dns_servers" ]]; then
-	echo "Reordering nameservers in /etc/resolv.conf" >&2
-	
-	# Prepend Docker DNS servers so they are tried first for local resolution
-	for dns in $docker_dns_servers; do
-		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
-			sed -i "1i nameserver $dns" /etc/resolv.conf
-		fi
-	done
-
-	# Ensure WireGuard DNS servers are also present
-	for dns in $wg_dns_servers; do
-		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
-			echo "nameserver $dns" >> /etc/resolv.conf
-		fi
-	done
-fi
-
 # IPv4 kill switch: traffic must be either (1) to the WireGuard interface, (2) marked as a WireGuard packet, (3) to a local address, or (4) to the container network
 container_ipv4_network="$(ip -o addr show dev eth0 | awk '$3 == "inet" {print $4}')"
 container_ipv4_network_rule=$([ ! -z "$container_ipv4_network" ] && echo "! -d $container_ipv4_network" || echo "")
@@ -98,6 +76,28 @@ do
 	ip route add $local_subnet via $default_route_ip
 	iptables -I OUTPUT -d $local_subnet -j ACCEPT
 done
+
+wg_dns_servers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}')
+echo "WireGuard DNS servers: $wg_dns_servers" >&2
+
+# Restore Docker's DNS servers alongside WireGuard's DNS
+if [[ ! -z "$docker_dns_servers" ]]; then
+	echo "Reordering nameservers in /etc/resolv.conf" >&2
+	
+	# Prepend Docker DNS servers so they are tried first for local resolution
+	for dns in $docker_dns_servers; do
+		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
+			sed -i "1i nameserver $dns" /etc/resolv.conf
+		fi
+	done
+
+	# Ensure WireGuard DNS servers are also present
+	for dns in $wg_dns_servers; do
+		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
+			echo "nameserver $dns" >> /etc/resolv.conf
+		fi
+	done
+fi
 
 shutdown () {
 	wg-quick down $interface
