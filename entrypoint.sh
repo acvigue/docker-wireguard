@@ -60,16 +60,10 @@ else
 fi
 
 # Allow traffic to RFC1918 private addresses and other local ranges to bypass the tunnel
-# This enables Docker DNS (127.0.0.11) and communication with other containers on bridge networks
-rfc_local_subnets=(
-	"10.0.0.0/8"        # RFC1918 Class A
-	"172.16.0.0/12"     # RFC1918 Class B
-	"192.168.0.0/16"    # RFC1918 Class C
-	"169.254.0.0/16"    # RFC3927 Link-local
-	"127.0.0.0/8"       # Loopback (includes Docker DNS at 127.0.0.11)
-)
+# This enables Docker DNS (127.0.0.11 on Linux, 192.168.65.x on Docker Desktop) and communication with other containers on bridge networks
+rfc_local_subnets="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 127.0.0.0/8"
 
-for local_subnet in "${rfc_local_subnets[@]}"
+for local_subnet in $rfc_local_subnets
 do
 	echo "Allowing traffic to local subnet ${local_subnet}" >&2
 	# Add route to send traffic via default gateway instead of VPN
@@ -79,13 +73,9 @@ do
 done
 
 # IPv6 local addresses
-ipv6_local_subnets=(
-	"fc00::/7"          # RFC4193 Unique Local Addresses
-	"fe80::/10"         # RFC4291 Link-local
-	"::1/128"           # Loopback
-)
+ipv6_local_subnets="fc00::/7 fe80::/10 ::1/128"
 
-for local_subnet in "${ipv6_local_subnets[@]}"
+for local_subnet in $ipv6_local_subnets
 do
 	echo "Allowing IPv6 traffic to local subnet ${local_subnet}" >&2
 	ip -6 route add $local_subnet via $(ip -6 route | grep default | awk '{print $3}') dev eth0 2>/dev/null || true
