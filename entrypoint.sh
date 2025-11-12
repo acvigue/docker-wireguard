@@ -22,6 +22,16 @@ if [[ "$(cat /proc/sys/net/ipv4/conf/all/src_valid_mark)" != "1" ]]; then
 	exit 1
 fi
 
+# Capture the public IP before starting VPN
+echo "Capturing public IP address before VPN starts..." >&2
+unmasked_ip=$(curl -s --max-time 10 ifconfig.me)
+if [[ -z "$unmasked_ip" ]]; then
+	echo "Warning: Failed to capture public IP before VPN start" >&2
+else
+	echo "$unmasked_ip" > /tmp/unmasked_address
+	echo "Original public IP: $unmasked_ip" >&2
+fi
+
 # The net.ipv4.conf.all.src_valid_mark sysctl is set when running the container, so don't have WireGuard also set it
 sed -i "s:sysctl -q net.ipv4.conf.all.src_valid_mark=1:echo Skipping setting net.ipv4.conf.all.src_valid_mark:" /usr/bin/wg-quick
 
