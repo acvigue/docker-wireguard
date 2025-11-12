@@ -32,15 +32,24 @@ echo "Preserving Docker DNS servers: $docker_dns_servers" >&2
 # Start WireGuard
 wg-quick up $interface
 
+wg_dns_servers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}')
+echo "WireGuard DNS servers: $wg_dns_servers" >&2
+
 # Restore Docker's DNS servers alongside WireGuard's DNS
 if [[ ! -z "$docker_dns_servers" ]]; then
-	echo "Restoring Docker DNS servers to /etc/resolv.conf" >&2
-	# Backup current resolv.conf set by WireGuard
-	cp /etc/resolv.conf /etc/resolv.conf.wg
+	echo "Reordering nameservers in /etc/resolv.conf" >&2
+	
 	# Prepend Docker DNS servers so they are tried first for local resolution
 	for dns in $docker_dns_servers; do
 		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
 			sed -i "1i nameserver $dns" /etc/resolv.conf
+		fi
+	done
+
+	# Ensure WireGuard DNS servers are also present
+	for dns in $wg_dns_servers; do
+		if ! grep -q "nameserver $dns" /etc/resolv.conf; then
+			echo "nameserver $dns" >> /etc/resolv.conf
 		fi
 	done
 fi
